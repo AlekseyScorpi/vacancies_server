@@ -17,7 +17,7 @@ class Model:
         )
         self._system_prompt = model_config.system_prompt
         
-    def _create_prompt(self, request):
+    def _create_prompt(self, request: str) -> str:
         prompt = f'''<|im_start|>system
 {self._system_prompt}<|im_end|>
 <|im_start|>user
@@ -34,17 +34,17 @@ class Model:
         schedule="",
         experience="",
         key_skills: List[str]=[],
-    ):
+    ) -> str:
         
-        capitalize_skills = [f"'{skill.capitalize()}'" for skill in key_skills]
+        capitalize_skills: List[str] = [f"'{skill.capitalize()}'" for skill in key_skills]
         
-        request = (f'Напиши текст вакансии для должности "{vacancy_name}". Название компании: "{company_name}". ',
+        request: str = (f'Напиши текст вакансии для должности "{vacancy_name}". Название компании: "{company_name}". ',
                    f'Расположение: {company_place}. График работы: {schedule}. Опыт работы: {experience}. ',
                    f'Ключевые навыки: {", ".join(capitalize_skills)}')
         
-        prompt = self._create_prompt(request=request)
+        prompt: str = self._create_prompt(request=request)
         
-        outputs = self._model(prompt)
+        outputs: str = self._model(prompt)
 
         while '<|im_end|>' in outputs:
             outputs = outputs.replace('<|im_end|>', '')
