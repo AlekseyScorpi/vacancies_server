@@ -7,13 +7,11 @@ from model_config import ModelConfig
 import json
 import threading
 import time
+import dotenv
+import os
 
 # app instance
 app = Flask(__name__)
-
-# json schemas
-with open('schemas.json') as f:
-    schemas = json.load(f)
 
 # config instance
 config = ModelConfig(
@@ -74,7 +72,7 @@ def check_answer_status():
         if (type(data)) == dict:
             data = json.dumps(data)
         
-        check_request = RequestCheckStatus.model_validate_json(data)
+        check_request = RequestCheckStatus.model_validate_json(data) # type: ignore
         
         token = check_request.token
         
@@ -114,7 +112,7 @@ def create_task():
         if type(data) == dict:
             data = json.dumps(data)
 
-        generate_request = RequestGenerateVacancy.model_validate_json(data)
+        generate_request = RequestGenerateVacancy.model_validate_json(data) # type: ignore
         
         with queue_lock:
             task_queue.append(generate_request)
@@ -141,6 +139,9 @@ def start_task_processing():
 
 if __name__ == "__main__":
     
+    dotenv.load_dotenv()
+    
     start_task_processing()
     
-    app.run(port=80)
+    port = os.getenv('FLASK_PORT')
+    app.run(port=int(port)) if port else app.run(port=80)
