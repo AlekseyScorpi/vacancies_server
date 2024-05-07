@@ -1,5 +1,6 @@
 from typing import Dict, List, Set
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from json_models import RequestCheckStatus, RequestGenerateVacancy
 from pydantic import ValidationError
 from model import Model
@@ -12,6 +13,7 @@ import os
 
 # app instance
 app = Flask(__name__)
+CORS(app)
 
 # config instance
 config = ModelConfig(
@@ -69,8 +71,12 @@ def check_answer_status():
     try:
         data = request.json
         
+        print(data)
+        
         if (type(data)) == dict:
             data = json.dumps(data)
+            
+        print(data)
         
         check_request = RequestCheckStatus.model_validate_json(data) # type: ignore
         

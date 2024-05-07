@@ -40,11 +40,11 @@ class Model:
         
         request: str = (f'Напиши текст вакансии для должности "{vacancy_name}". Название компании: "{company_name}". ',
                    f'Расположение: {company_place}. График работы: {schedule}. Опыт работы: {experience}. ',
-                   f'Ключевые навыки: {", ".join(capitalize_skills)}')
+                   f'Ключевые навыки: {", ".join(capitalize_skills)}') # type: ignore
         
         prompt: str = self._create_prompt(request=request)
         
-        outputs: str = self._model(prompt)
+        outputs: str = self._model(prompt) # type: ignore
 
         while '<|im_end|>' in outputs:
             outputs = outputs.replace('<|im_end|>', '')
