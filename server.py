@@ -11,9 +11,14 @@ import time
 import dotenv
 import os
 
+# env var load
+dotenv.load_dotenv()
+port = os.getenv('FLASK_PORT')
+client_domain = os.getenv('CLIENT_DOMAIN')
+
 # app instance
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=[client_domain if client_domain else "/", "http://localhost:3000"])
 
 # config instance
 config = ModelConfig(
@@ -71,12 +76,8 @@ def check_answer_status():
     try:
         data = request.json
         
-        print(data)
-        
         if (type(data)) == dict:
             data = json.dumps(data)
-            
-        print(data)
         
         check_request = RequestCheckStatus.model_validate_json(data) # type: ignore
         
@@ -144,10 +145,5 @@ def start_task_processing():
     thread.start()
 
 if __name__ == "__main__":
-    
-    dotenv.load_dotenv()
-    
     start_task_processing()
-    
-    port = os.getenv('FLASK_PORT')
     app.run(port=int(port)) if port else app.run(port=80)
