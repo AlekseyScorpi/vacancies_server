@@ -35,22 +35,32 @@ model = Model(config)
 
 task_queue: List[RequestGenerateVacancy] = []
 processing_tasks: Set[str] = set()
-result_pool: Dict[str, str] = {}
+result_pool: Dict[str, Dict[str, str | float]] = {}
 queue_lock = threading.Lock()
 processing_lock = threading.Lock()
 result_lock = threading.Lock()
+
+MAX_CACHE_TIME = 60
 
 
 
 def process_task():
     while True:
+        with result_lock:
+            del_tokens=[]
+            for token in result_pool:
+                if time.time() - result_pool[token]['timestamp'] > MAX_CACHE_TIME: # type: ignore
+                    del_tokens.append(token)
+            for token in del_tokens:
+                del result_pool[token]
+        
         with queue_lock:
             task = task_queue.pop(0) if task_queue else None
         
         if task:
             result = process_task_logic(task)
             with result_lock:
-                result_pool[task.token] = result
+                result_pool[task.token] = {'content': result, 'timestamp': time.time()}
             with processing_lock:
                 processing_tasks.remove(task.token)
         else:
