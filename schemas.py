@@ -15,7 +15,7 @@ class RequestGenerateVacancy(BaseModel):
     key_skills: List[str] = Field(alias='keySkills', default=[])
     token: str
     
-class RequestCheckStatus(BaseModel):
+class RequestUserConnect(BaseModel):
     """Class for check-answer request validation to check current task status
 
     Args:
