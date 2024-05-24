@@ -17,7 +17,7 @@ To generate text, the server uses a large language model. Model is finetuned Sai
 * Run it 😉 , example run script ```docker run --gpus all -p 80:80 vacancies-server-saiga3```
 
 ### Default python way
-* First, create new virtual environment and activate it
+* First, create new virtual environment and activate it (for this project python 3.11 is using)
 * Second, set new environment variable ```ENV CMAKE_ARGS="-DLLAMA_CUDA=on"``` to build llama_cpp_python with CUDA (be sure, that you have CUDA Toolkit on your device)
 * Then ```run pip install -r requirements.txt```
 * Now you can run your server with ```python start.py```
