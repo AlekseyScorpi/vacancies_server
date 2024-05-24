@@ -1,16 +1,16 @@
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Union
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_socketio import SocketIO, disconnect, rooms
-from schemas import RequestUserConnect, RequestGenerateVacancy
+from flask_socketio import SocketIO, disconnect
+from schemas import RequestUserConnect, RequestGenerateVacancy, ModelConfig
 from pydantic import ValidationError
 from model import Model
-from model_config import ModelConfig
 import json
 import threading
 import time
 import dotenv
 import os
+import logging
 
 # environment variables load
 dotenv.load_dotenv()
@@ -26,25 +26,12 @@ socketio = SocketIO(app, cors_allowed_origins=[client_domain if client_domain el
 # set CORS policy
 CORS(app, origins=[client_domain if client_domain else "/", "http://localhost:3000"])
 
-# config instance
-config = ModelConfig(
-        model_folder="generation_model",
-        model_file="model-Q5_K_M.gguf",
-        gpu_layers=10,
-        threads=8,
-        context_length=2800,
-        max_new_tokens=2048,
-)
-
-# model instance
-model = Model(config)
-
 # queue for waiting tasks
 task_queue: List[RequestGenerateVacancy] = []
 # tasks which is currently processing by model
 processing_tasks: Set[str] = set()
 # result pool
-result_pool: Dict[str, Dict[str, str | float]] = {}
+result_pool: Dict[str, Dict[str, Union[str, float]]] = {}
 # users pool
 user_pool: Dict[str, str] = {}
 # mutex for tasks queue
@@ -60,7 +47,7 @@ user_lock = threading.Lock()
 condition = threading.Condition()
 
 # time, before the task is removed from the result pool if it is not requested to receive 
-MAX_CACHE_TIME = 60
+MAX_CACHE_TIME = 10
 # event name for update, this name also should be using on client to correctly read socket
 UPDATE_EVENT_NAME = 'queue_update'
 
@@ -75,6 +62,7 @@ def process_task():
                 if time.time() - result_pool[token]['timestamp'] > MAX_CACHE_TIME: # type: ignore
                     del_tokens.append(token)
             for token in del_tokens:
+                logging.warning(f"Task by token {token} was deleted due to the expiration cache time")
                 del result_pool[token]
         
         with queue_lock:
@@ -86,7 +74,7 @@ def process_task():
                 with result_lock:
                     result_pool[task.token] = {'content': result, 'timestamp': time.time()}
             except(RuntimeError):
-                print(f"{'%Y-%m-%d %H:%M:%S', time.localtime()} Task by token={task.token} cannot be completed, unexpected error occured")
+                logging.error(f"Task by token={task.token} cannot be completed, unexpected error occured")
             with processing_lock:
                 processing_tasks.remove(task.token)
             send_position_info()
@@ -145,8 +133,11 @@ def handle_user_connect(data):
         token = data.token
         with user_lock:
             user_pool[user_sid] = token # type: ignore
+            logging.info(f"User connect by user sid {user_sid} with token {token}")
+            time.sleep(0.3)
             update_queue_position(user_sid, token)
     except ValidationError as e:
+        logging.warning(f"Validation error in handle_user_connect: {e}")
         disconnect(user_sid)
         
 @socketio.on('disconnect')
@@ -160,6 +151,7 @@ def handle_disconnect():
     try:
         token = user_pool[user_sid]
     except KeyError:
+        logging.warning(f"Cannot find token by user sid {user_sid}")
         return "Invalid token"
     
     with user_lock:
@@ -179,6 +171,7 @@ def update_queue_position(sid: str, token: str):
         sid (str): user socket sid
         token (str): user token for task
     """
+    logging.info(f"Send info by sid {sid} and token {token}")
     if token in result_pool:
         answer = result_pool[token]['content']
         socketio.emit(UPDATE_EVENT_NAME, {'message': 'GOOD', 'content': answer}, room=sid) # type: ignore
@@ -230,5 +223,28 @@ def start_task_processing():
 if __name__ == "__main__":
     """Start flask server
     """
+    logging.basicConfig(level=logging.INFO, filename="py_log.log",filemode="w",
+                    format="%(asctime)s %(levelname)s %(message)s")
+    
+    # config instance
+    with open('model_config.json') as f:
+        try:
+            json_config = json.load(f)
+        except:
+            logging.error('Failed to load model_config.json as json')
+            exit()
+    try:
+        config = ModelConfig.model_validate(json_config)
+    except ValidationError as e:
+        logging.error(f"Failed to load config: {e}")
+        exit()
+    
+    # model instance
+    try:
+        model = Model(config)
+    except Exception as e:
+        logging.error(f"Failed to load model: {e}")
+        exit()
+    
     start_task_processing()
-    app.run(port=int(port)) if port else app.run(port=80)
+    app.run(debug=False, port=int(port)) if port else app.run(debug=False, port=8080)

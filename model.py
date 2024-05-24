@@ -1,28 +1,29 @@
 import os
 from typing import List
 
-from model_config import ModelConfig
-from ctransformers import AutoModelForCausalLM
+from schemas import ModelConfig
+from llama_cpp import Llama
 
 class Model:
     """Model class for Saiga-Mistral models
     """
-    def __init__(self, model_config: ModelConfig) -> None:
-        """Init Saiga-Mistral model
+    def __init__(self, config: ModelConfig) -> None:
+        """Init Saiga Llama 3 model
 
         Args:
             model_config (ModelConfig): config for model initialization, more information in ModelConfig class
         """
-        model_path = os.path.join(model_config.model_folder, model_config.model_file)
+        model_path = os.path.join(config.folder_name, config.file_name)
         
-        self._model = AutoModelForCausalLM.from_pretrained(
-            model_path,
-            gpu_layers=model_config.gpu_layers,
-            context_length=model_config.context_length,
-            max_new_tokens=model_config.max_new_tokens,
-            threads=model_config.threads
+        self._model = Llama(
+            model_path=model_path,
+            n_gpu_layers=config.gpu_layers,
+            n_threads=config.threads,
+            n_ctx=config.context_length,
+            n_batch=config.max_new_tokens,
+            verbose=False,
         )
-        self._system_prompt = model_config.system_prompt
+        self._system_prompt = config.system_prompt
         
     def _create_prompt(self, request: str) -> str:
         """This function create correctly prompt based on model
@@ -34,11 +35,9 @@ class Model:
         Returns:
             str: correctly prompt which can be transmitted to the model
         """
-        prompt: str = f'''<|im_start|>system
-{self._system_prompt}<|im_end|>
-<|im_start|>user
-{request}<|im_end|>
-<|im_start|>assistant'''
+        prompt: str = f'''<|begin_of_text|><|start_header_id|>system<|end_header_id|>
+{self._system_prompt}<|eot_id|><|start_header_id|>user<|end_header_id|>
+{request}<|eot_id|><|start_header_id|>assistant<|end_header_id|>'''
 
         return prompt
     
@@ -107,18 +106,35 @@ class Model:
         )
         
         prompt: str = self._create_prompt(request=request)
+        prompt_bytes = bytes(prompt, encoding='utf-8')
         
-        outputs: str = ""
+        error_counter = -1
+        outputs = ""
         
         try:
-            outputs: str = self._model(prompt) # type: ignore
+            while outputs == None or outputs == "" or len(outputs) < 20:
+                error_counter += 1
+                if error_counter > 2:
+                    raise RuntimeError("Unexpected model generation error")
+                inputs = self._model.tokenize(prompt_bytes, add_bos=False, special=True)
+                result: dict = self._model(
+                    inputs, # type: ignore
+                    max_tokens=self._model.n_batch,
+                    stop=[
+                        '<|eot_id|>',
+                        '<|eot_|>',
+                        '|<|end_of_ text|>',
+                        '|<|end_of_text|>',
+                        '<|end_of_text|>',
+                        '|<|end_header_id|>',
+                        '<|eot_1|>',
+                        '<|eot_2|>',
+                    ]
+                )
+                outputs = result['choices'][0]['text']
         except:
             raise RuntimeError("Unexpected model generation error")
-
-        while '<|im_end|>' in outputs:
-            outputs = outputs.replace('<|im_end|>', '')
-        while '<|im_start|>' in outputs:
-            outputs = outputs.replace('<|im_start|>', '')
+        
         while ';' in outputs:
             outputs = outputs.replace(';', '\n')
         return outputs

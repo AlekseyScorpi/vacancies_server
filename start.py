@@ -1,21 +1,34 @@
 import os
 import sys
 import subprocess
+from venv import logger
 from dotenv import load_dotenv
 import time
 
 def start_server():
     print("Starting Flask server...")
-    python_executable = sys.executable
-    subprocess.Popen([python_executable, "server.py"])
+    try:
+        python_executable = sys.executable
+        subprocess.Popen([python_executable, "server.py"])
+    except Exception as e:
+        logger.error(f"Failed to start Flask server: {e}")
+        sys.exit(1)
 
 def set_ngrok_auth_token(auth_token):
     print("Setting ngrok auth token...")
-    subprocess.run(["ngrok", "authtoken", auth_token])
+    try:
+        subprocess.run(["ngrok", "authtoken", auth_token])
+    except Exception as e:
+        logger.error(f"Failed to set ngrok token: {e}")
+        sys.exit(1)
 
 def start_ngrok(domain, port):
     print("Starting ngrok...")
-    subprocess.Popen(["ngrok", "http", "--domain=" + domain, port])
+    try:
+        subprocess.Popen(["ngrok", "http", "--domain=" + domain, port])
+    except Exception as e:
+        logger.error(f"Failed to start ngrok: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     
