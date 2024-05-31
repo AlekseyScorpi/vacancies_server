@@ -15,16 +15,16 @@ import logging
 # environment variables load
 dotenv.load_dotenv()
 # port for flask server
-port = os.getenv('FLASK_PORT')
+port = int(os.getenv('FLASK_PORT', default=8080))
 # client domain (need to CORS policy)
-client_domain = os.getenv('CLIENT_DOMAIN')
+client_domain = os.getenv('CLIENT_DOMAIN', default="/")
 
 # app instance
 app = Flask(__name__)
 # set socketIO
-socketio = SocketIO(app, cors_allowed_origins=[client_domain if client_domain else "/", "http://localhost:3000"])
+socketio = SocketIO(app, cors_allowed_origins=[client_domain, "http://localhost:3000"])
 # set CORS policy
-CORS(app, origins=[client_domain if client_domain else "/", "http://localhost:3000"])
+CORS(app, origins=[client_domain, "http://localhost:3000"])
 
 # queue for waiting tasks
 task_queue: List[RequestGenerateVacancy] = []
@@ -247,4 +247,4 @@ if __name__ == "__main__":
         exit()
     
     start_task_processing()
-    app.run(debug=False, port=int(port)) if port else app.run(debug=False, port=8080)
+    app.run(debug=False, port=port)
